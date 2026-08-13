@@ -106,6 +106,17 @@ di riferimento di tutti i possibili nomi di prodotto. È un **limite strutturale
 accettato** dell'approccio "AI multimodale come OCR intelligente", non un bug da
 correggere nel codice.
 
+### Nota sui limiti del tier gratuito Gemini
+
+Il modello `gemini-2.5-flash` ha un limite di circa **20 richieste al giorno** sul
+piano gratuito (ridotto da Google a **dicembre 2025** — in precedenza era circa
+250/giorno). La demo pubblica potrebbe quindi mostrare temporaneamente un messaggio
+di *"limite giornaliero raggiunto"* se la quota del giorno è già esaurita; si
+resetta ogni 24 ore. È un limite del servizio esterno, non del progetto — gestito
+esplicitamente nel codice (`extract_receipt()` in `src/extractor.py`) con un
+messaggio d'errore chiaro invece di un crash silenzioso o un traceback tecnico
+esposto all'utente.
+
 ---
 
 ## 📂 Struttura del Repository
