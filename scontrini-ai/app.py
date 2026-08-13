@@ -18,6 +18,7 @@ from src.extractor import extract_receipt
 from src.validator import validate
 
 COLORE_ACCENTO = "#4F8BF9"  # stesso primaryColor di .streamlit/config.toml
+DIMENSIONE_FONT_GRAFICI = 14  # più leggibile del default (~12) quando il grafico si restringe
 
 st.set_page_config(page_title="Scontrini AI", page_icon="🧾", layout="wide")
 
@@ -181,11 +182,16 @@ with tab_dashboard:
             )
             numero_da_rivedere = len(scontrini_da_rivedere_ids)
 
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Totale speso", f"€ {totale_speso:.2f}")
-            col2.metric("Numero di scontrini", numero_scontrini)
-            col3.metric("Spesa media per scontrino", f"€ {spesa_media:.2f}")
-            with col4:
+            # Griglia 2x2 invece di 4 colonne affiancate: su schermi stretti
+            # (mobile) 4 colonne in fila diventano illeggibili, mentre 2x2
+            # resta leggibile sia su desktop sia su smartphone.
+            riga1_col1, riga1_col2 = st.columns(2)
+            riga1_col1.metric("Totale speso", f"€ {totale_speso:.2f}")
+            riga1_col2.metric("Numero di scontrini", numero_scontrini)
+
+            riga2_col1, riga2_col2 = st.columns(2)
+            riga2_col1.metric("Spesa media per scontrino", f"€ {spesa_media:.2f}")
+            with riga2_col2:
                 st.metric("Scontrini da rivedere", numero_da_rivedere)
                 if numero_da_rivedere > 0:
                     st.error(f"⚠️ {numero_da_rivedere} da controllare")
@@ -205,47 +211,48 @@ with tab_dashboard:
                     labels={"data": "Data", "prezzo_totale": "Spesa (€)"},
                 )
                 fig_tempo.update_traces(line_color=COLORE_ACCENTO, line_width=2)
-                fig_tempo.update_layout(yaxis_tickprefix="€ ", hovermode="x unified")
+                fig_tempo.update_layout(
+                    yaxis_tickprefix="€ ", hovermode="x unified", font=dict(size=DIMENSIONE_FONT_GRAFICI)
+                )
                 st.plotly_chart(fig_tempo, use_container_width=True)
 
-            # --- Due grafici affiancati ---
-            col_cat_chart, col_negozio_chart = st.columns(2)
+            # Grafici impilati verticalmente (non più affiancati in colonne):
+            # su schermi stretti (mobile) due grafici affiancati diventano
+            # troppo compressi per essere leggibili, mentre a piena larghezza
+            # restano leggibili sia su desktop sia su smartphone.
+            st.subheader("Spesa per categoria")
+            spesa_categoria = (
+                df_filtrato.groupby("categoria", as_index=False)["prezzo_totale"]
+                .sum()
+                .sort_values("prezzo_totale", ascending=True)
+            )
+            fig_categoria = px.bar(
+                spesa_categoria,
+                x="prezzo_totale",
+                y="categoria",
+                orientation="h",
+                labels={"prezzo_totale": "Spesa (€)", "categoria": "Categoria"},
+            )
+            fig_categoria.update_traces(marker_color=COLORE_ACCENTO)
+            fig_categoria.update_layout(xaxis_tickprefix="€ ", font=dict(size=DIMENSIONE_FONT_GRAFICI))
+            st.plotly_chart(fig_categoria, use_container_width=True)
 
-            with col_cat_chart:
-                st.subheader("Spesa per categoria")
-                spesa_categoria = (
-                    df_filtrato.groupby("categoria", as_index=False)["prezzo_totale"]
-                    .sum()
-                    .sort_values("prezzo_totale", ascending=True)
-                )
-                fig_categoria = px.bar(
-                    spesa_categoria,
-                    x="prezzo_totale",
-                    y="categoria",
-                    orientation="h",
-                    labels={"prezzo_totale": "Spesa (€)", "categoria": "Categoria"},
-                )
-                fig_categoria.update_traces(marker_color=COLORE_ACCENTO)
-                fig_categoria.update_layout(xaxis_tickprefix="€ ")
-                st.plotly_chart(fig_categoria, use_container_width=True)
-
-            with col_negozio_chart:
-                st.subheader("Spesa per negozio")
-                spesa_negozio = (
-                    df_filtrato.groupby("negozio", as_index=False)["prezzo_totale"]
-                    .sum()
-                    .sort_values("prezzo_totale", ascending=True)
-                )
-                fig_negozio = px.bar(
-                    spesa_negozio,
-                    x="prezzo_totale",
-                    y="negozio",
-                    orientation="h",
-                    labels={"prezzo_totale": "Spesa (€)", "negozio": "Negozio"},
-                )
-                fig_negozio.update_traces(marker_color=COLORE_ACCENTO)
-                fig_negozio.update_layout(xaxis_tickprefix="€ ")
-                st.plotly_chart(fig_negozio, use_container_width=True)
+            st.subheader("Spesa per negozio")
+            spesa_negozio = (
+                df_filtrato.groupby("negozio", as_index=False)["prezzo_totale"]
+                .sum()
+                .sort_values("prezzo_totale", ascending=True)
+            )
+            fig_negozio = px.bar(
+                spesa_negozio,
+                x="prezzo_totale",
+                y="negozio",
+                orientation="h",
+                labels={"prezzo_totale": "Spesa (€)", "negozio": "Negozio"},
+            )
+            fig_negozio.update_traces(marker_color=COLORE_ACCENTO)
+            fig_negozio.update_layout(xaxis_tickprefix="€ ", font=dict(size=DIMENSIONE_FONT_GRAFICI))
+            st.plotly_chart(fig_negozio, use_container_width=True)
 
             # --- Tabella scontrini da rivedere ---
             if numero_da_rivedere > 0:
