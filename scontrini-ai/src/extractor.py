@@ -90,10 +90,18 @@ def extract_receipt(image: Image.Image) -> dict:
     """
     client = _get_client()
 
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=[EXTRACTION_PROMPT, image],
-    )
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[EXTRACTION_PROMPT, image],
+        )
+    except genai.errors.ClientError as e:
+        if getattr(e, "code", None) == 429 or "RESOURCE_EXHAUSTED" in str(e):
+            raise RuntimeError(
+                "Limite giornaliero del servizio AI raggiunto. Riprova più tardi "
+                "(la quota si resetta ogni 24 ore)."
+            ) from e
+        raise
 
     testo_risposta = response.text.strip()
 
