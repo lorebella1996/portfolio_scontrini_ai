@@ -245,7 +245,7 @@ spesa** (filtri, KPI, grafici, revisione).
 
 ## 🌐 Demo Live
 
-[LINK]
+[[LINK]](https://portfolioscontriniai-cw9dto9vgrfhdumzn8inlv.streamlit.app/)
 
 ---
 
