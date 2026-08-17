@@ -48,6 +48,7 @@ Upload (Streamlit file_uploader)
     │
     ▼  extractor.py — Gemini 2.5 Flash (vision multimodale)
 Estrazione: JSON strutturato (negozio, data, prodotti, totale_dichiarato)
+            ogni prodotto include categoria e tipo ("prodotto" o "sconto")
     │
     ▼  validator.py — controlli di coerenza numerica (tolleranza 0.05)
 Validazione: (is_valid, note[]) — NON blocca mai il salvataggio
@@ -73,13 +74,30 @@ tra cui:
   (es. `"REPARTO 1"`), da mantenere così come sono anziché inventare un nome
   plausibile;
 - parole spezzate a fine riga per mancanza di spazio (es. `"AC"` / `"QUA"` →
-  `"Acqua"`), da ricostruire invece di lasciare troncate.
+  `"Acqua"`), da ricostruire invece di lasciare troncate;
+- ogni prodotto viene classificato in una tra **10 categorie**: Ristorazione,
+  Alimentari, Abbigliamento, Farmacia, Trasporti, Casa & Bricolage, Bellezza &
+  Cura personale, Tempo libero, Tabacchi, Altro.
+
+**Prodotto vs. sconto.** Ogni riga estratta ha anche un campo `tipo`, che vale
+`"prodotto"` oppure `"sconto"`. La distinzione esiste perché sconti, annullamenti
+cassiera o altre rettifiche **non sono acquisti reali**: trattarli come prodotti
+normali generava falsi allarmi in validazione — un prezzo negativo su un prodotto
+vero è un'incoerenza da segnalare, ma su una riga di sconto è normale e atteso. Il
+prompt istruisce il modello a riconoscere questi casi anche quando la dicitura non
+contiene parole esplicite come "sconto" o "annullo", usando un indizio strutturale:
+un importo negativo il cui valore assoluto coincide con il prezzo del prodotto
+immediatamente precedente sullo scontrino è quasi sempre l'annullamento di quel
+prodotto specifico.
 
 **Validazione.** `validator.py` controlla — senza mai bloccare il salvataggio — che:
 i campi obbligatori siano presenti, che la data sia una data calendaristica reale,
-che per ogni prodotto `quantità × prezzo_unitario ≈ prezzo_totale` (tolleranza
-assoluta **0.05**, per arrotondamenti), che non ci siano quantità o prezzi negativi,
-e che la somma dei prodotti corrisponda al totale dichiarato sullo scontrino.
+che per ogni riga di tipo `"prodotto"` `quantità × prezzo_unitario ≈ prezzo_totale`
+(tolleranza assoluta **0.05**, per arrotondamenti) e che non ci siano quantità o
+prezzi negativi, e che la somma di **tutte** le righe (prodotti e sconti insieme)
+corrisponda al totale dichiarato sullo scontrino. Le righe di tipo `"sconto"` sono
+esentate dai controlli di segno e di coerenza quantità×prezzo, che per una rettifica
+non avrebbero senso.
 
 **Salvataggio.** Qualsiasi esito della validazione produce comunque una scrittura
 su database: la differenza è solo nel valore di `stato_validazione`. Questa è la
@@ -89,22 +107,51 @@ controllare, non un errore da nascondere.
 **Dashboard.** Un unico set di filtri (categoria prodotto, intervallo di date)
 alimenta in modo condiviso 4 KPI, un grafico di andamento della spesa nel tempo, due
 grafici di ripartizione (per categoria e per negozio) e una tabella dedicata agli
-scontrini in stato `da_rivedere`, sempre visibile quando ce ne sono.
+scontrini in stato `da_rivedere`, sempre visibile quando ce ne sono. I KPI e il
+grafico "Spesa nel tempo" includono **sempre tutte le righe**, sconti compresi,
+perché riflettono la spesa netta reale; i grafici "Spesa per categoria" e "Spesa per
+negozio" **escludono le righe di tipo `"sconto"`**, per non distorcere il confronto
+tra categorie o negozi con importi che non sono acquisti.
 
 ### Nota metodologica: i limiti dell'estrazione via LLM
 
 L'estrazione tramite modello multimodale **non è perfettamente deterministica** tra
-chiamate identiche sulla stessa immagine. Durante i test è stato osservato un caso
-concreto: la stessa foto di uno scontrino, estratta due volte in momenti diversi, ha
-restituito una volta il prodotto come `"Cozze Marinara"` e un'altra volta come
-`"Sozze Marinara"` (una lettera diversa, C → S).
+chiamate identiche sulla stessa immagine. Durante i test sono stati osservati diversi
+casi concreti:
+
+- La stessa foto di uno scontrino, estratta due volte in momenti diversi, ha
+  restituito una volta il prodotto come `"Cozze Marinara"` e un'altra volta come
+  `"Sozze Marinara"` (una lettera diversa, C → S).
+- Un prezzo composto da quantità × prezzo unitario è stato, in un caso, semplificato
+  in un valore aggregato, perdendo il dettaglio della scomposizione originale pur
+  restando numericamente coerente con il totale — nessun errore di importo, solo una
+  ricostruzione meno fedele della struttura originale della riga.
+- Una riga di annullo cassiera con importo negativo è stata, in un altro scontrino
+  reale, classificata come `tipo: "prodotto"` invece che `"sconto"`, nonostante il
+  prompt contenga un'istruzione esplicita pensata proprio per riconoscere questo
+  pattern (importo negativo pari al prezzo del prodotto immediatamente precedente).
+  La validazione numerica ha comunque intercettato l'anomalia — un prezzo negativo su
+  un prodotto reale è per definizione un'incoerenza — mandando lo scontrino in
+  quarantena invece di lasciare corrompere silenziosamente i dati.
+- Un'abbreviazione ambigua nel nome di un prodotto (es. un prefisso che identifica
+  una variante specifica di un menu) è stata categorizzata in modo plausibile ma
+  sbagliato, per mancanza di un contesto che nessun sistema — umano compreso, senza
+  conoscere il menu specifico dell'esercizio — potrebbe risolvere con certezza.
+- Un prodotto comparso su due righe identiche consecutive dello scontrino è stato, in
+  un caso, ricondotto a una sola riga, perdendo il duplicato. Anche qui la
+  validazione ha segnalato correttamente l'incoerenza tra somma dei prodotti e
+  totale dichiarato, mandando lo scontrino in quarantena invece di salvare un dato
+  silenziosamente sbagliato.
 
 La validazione numerica intercetta correttamente le incoerenze su prezzi e quantità,
-ma **non può** verificare la correttezza ortografica del testo libero (il nome di un
-prodotto): non esiste, né avrebbe senso costruire per questo progetto, un dizionario
-di riferimento di tutti i possibili nomi di prodotto. È un **limite strutturale
-accettato** dell'approccio "AI multimodale come OCR intelligente", non un bug da
-correggere nel codice.
+ma **non può** verificare la correttezza ortografica o semantica del testo libero (il
+nome o la categoria di un prodotto): non esiste, né avrebbe senso costruire per
+questo progetto, un dizionario di riferimento di tutti i possibili nomi di prodotto o
+il menu di ogni esercizio commerciale. È un **limite strutturale accettato**
+dell'approccio "AI multimodale come OCR intelligente", non un bug da correggere nel
+codice — ed è anche la ragione d'essere della coda "da rivedere": quando la
+validazione numerica non basta a garantire la correttezza, il dato resta comunque
+disponibile per un controllo umano invece di sparire.
 
 ### Nota sui limiti del tier gratuito Gemini
 
@@ -112,10 +159,11 @@ Il modello `gemini-2.5-flash` ha un limite di circa **20 richieste al giorno** s
 piano gratuito (ridotto da Google a **dicembre 2025** — in precedenza era circa
 250/giorno). La demo pubblica potrebbe quindi mostrare temporaneamente un messaggio
 di *"limite giornaliero raggiunto"* se la quota del giorno è già esaurita; si
-resetta ogni 24 ore. È un limite del servizio esterno, non del progetto — gestito
-esplicitamente nel codice (`extract_receipt()` in `src/extractor.py`) con un
-messaggio d'errore chiaro invece di un crash silenzioso o un traceback tecnico
-esposto all'utente.
+resetta ogni 24 ore. È un limite del servizio esterno, non del progetto — l'errore
+**429 (`RESOURCE_EXHAUSTED`)** restituito dall'API viene intercettato esplicitamente
+nel codice (`extract_receipt()` in `src/extractor.py`) e tradotto in un messaggio
+chiaro per l'utente, invece di lasciar propagare un traceback tecnico grezzo fino
+all'interfaccia.
 
 ---
 
@@ -129,6 +177,7 @@ scontrini-ai/
 │   └── secrets.toml.example      # Template credenziali, SENZA valori veri
 │
 ├── src/
+│   ├── __init__.py
 │   ├── extractor.py              # Estrazione dati da immagine (Gemini vision)
 │   ├── validator.py              # Validazione di coerenza numerica
 │   └── database.py               # Accesso a Supabase (salvataggio/lettura)
@@ -163,7 +212,8 @@ CREATE TABLE prodotti (
     quantita           NUMERIC NOT NULL,
     prezzo_unitario    NUMERIC NOT NULL,
     prezzo_totale      NUMERIC NOT NULL,
-    categoria          TEXT
+    categoria          TEXT,
+    tipo               TEXT NOT NULL DEFAULT 'prodotto'  -- 'prodotto' oppure 'sconto'
 );
 
 ALTER TABLE scontrini ENABLE ROW LEVEL SECURITY;
@@ -182,6 +232,10 @@ così com'è stata letta. Nessuna informazione va persa nemmeno per gli scontrin
 quarantena: la dashboard mostra `data_raw` al posto di `data` quando quest'ultima è
 assente.
 
+Il campo **`tipo`** distingue le righe che rappresentano un acquisto reale da quelle
+che sono sconti o rettifiche — vedi la sezione Architettura per la logica completa e
+per come viene usato nella dashboard.
+
 ---
 
 ## 🛠️ Stack Tecnico
@@ -192,7 +246,9 @@ assente.
 - **Streamlit** — interfaccia web (upload, dashboard) e hosting su Streamlit
   Community Cloud
 - **PostgreSQL / Supabase** — database relazionale gratuito, con **Row Level
-  Security abilitata** e policy esplicite sulle tabelle `scontrini` e `prodotti`
+  Security abilitata** e policy esplicite (permissive, coerenti con l'assenza di
+  autenticazione — vedi Nota sulla demo pubblica) sulle tabelle `scontrini` e
+  `prodotti`
 - **Plotly** — grafici interattivi della dashboard (andamento spesa, ripartizioni
   per categoria/negozio)
 - **Pandas** — aggregazione e filtro dei dati per la dashboard
@@ -243,9 +299,23 @@ spesa** (filtri, KPI, grafici, revisione).
 
 ---
 
+### 📢 Nota sulla demo pubblica
+
+Questa demo non implementa autenticazione: tutti i dati caricati sono salvati in un
+database condiviso, visibile a chiunque usi l'app — non c'è separazione tra utenti
+(l'interfaccia stessa lo segnala esplicitamente, con un avviso prima dell'upload e
+uno nella dashboard). È una scelta deliberata per mantenere il progetto semplice come
+pezzo di portfolio; le policy RLS su Supabase sono già scritte in un modo che
+renderebbe l'aggiunta di autenticazione multi-utente un'estensione naturale, non una
+riscrittura: basterebbe collegare **Supabase Auth**, aggiungere una colonna
+`user_id` alle tabelle, e restringere le policy da `USING (true)` a
+`USING (auth.uid() = user_id)`.
+
+---
+
 ## 🌐 Demo Live
 
-[[LINK]](https://portfolioscontriniai-cw9dto9vgrfhdumzn8inlv.streamlit.app/)
+[Prova la demo live](https://portfolioscontriniai-cw9dto9vgrfhdumzn8inlv.streamlit.app/)
 
 ---
 
