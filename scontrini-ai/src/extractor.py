@@ -39,7 +39,7 @@ nessun blocco markdown ```), con questa struttura esatta:
       "quantita": numero,
       "prezzo_unitario": numero,
       "prezzo_totale": numero,
-      "categoria": "una tra: Ristorazione, Alimentari, Abbigliamento, Farmacia, Trasporti, Altro"
+      "categoria": "una tra: Ristorazione, Alimentari, Abbigliamento, Farmacia, Trasporti, Casa & Bricolage, Bellezza & Cura personale, Tempo libero, Tabacchi, Altro"
     }
   ],
   "totale_dichiarato": numero
