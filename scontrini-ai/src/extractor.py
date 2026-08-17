@@ -39,7 +39,8 @@ nessun blocco markdown ```), con questa struttura esatta:
       "quantita": numero,
       "prezzo_unitario": numero,
       "prezzo_totale": numero,
-      "categoria": "una tra: Ristorazione, Alimentari, Abbigliamento, Farmacia, Trasporti, Casa & Bricolage, Bellezza & Cura personale, Tempo libero, Tabacchi, Altro"
+      "categoria": "una tra: Ristorazione, Alimentari, Abbigliamento, Farmacia, Trasporti, Casa & Bricolage, Bellezza & Cura personale, Tempo libero, Tabacchi, Altro",
+      "tipo": "prodotto oppure sconto"
     }
   ],
   "totale_dichiarato": numero
@@ -68,9 +69,16 @@ REGOLE IMPORTANTI per casi ambigui, molto comuni sugli scontrini reali:
 5. Se un campo non è determinabile con certezza, usa 0 per i numeri o stringa vuota per
    il testo — non inventare mai dati plausibili ma non presenti sullo scontrino.
 
-6. Se una parola risulta visivamente spezzata su due righe per mancanza di spazio 
-   (es. "AC" a fine riga e "QUA" sulla riga successiva, che insieme formano "ACQUA"), 
+6. Se una parola risulta visivamente spezzata su due righe per mancanza di spazio
+   (es. "AC" a fine riga e "QUA" sulla riga successiva, che insieme formano "ACQUA"),
    ricostruisci la parola intera nel campo "nome" — non lasciarla troncata a metà.
+
+7. Se una riga rappresenta uno sconto, un annullamento (es. errore cassiera corretto),
+   un reso, o qualsiasi rettifica che non è un prodotto/servizio realmente acquistato,
+   imposta "tipo" a "sconto" invece di "prodotto". In questo caso il prezzo_totale può
+   essere negativo (è normale e atteso), e "quantita"/"prezzo_unitario" possono essere
+   impostati a 1 e uguali al prezzo_totale se non hanno un significato chiaro per quella
+   riga.
 
 Rispondi ESCLUSIVAMENTE con il JSON, nient'altro.
 """
