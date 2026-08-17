@@ -78,7 +78,11 @@ REGOLE IMPORTANTI per casi ambigui, molto comuni sugli scontrini reali:
    imposta "tipo" a "sconto" invece di "prodotto". In questo caso il prezzo_totale può
    essere negativo (è normale e atteso), e "quantita"/"prezzo_unitario" possono essere
    impostati a 1 e uguali al prezzo_totale se non hanno un significato chiaro per quella
-   riga.
+   riga. Presta particolare attenzione a righe con importo negativo il cui valore
+   assoluto corrisponde al prezzo di un prodotto immediatamente precedente nello
+   scontrino: è quasi sempre l'annullamento di quel prodotto specifico, anche se la
+   dicitura non contiene parole esplicite come "sconto" o "annullo" — classificala
+   comunque come tipo: "sconto", non come "prodotto".
 
 Rispondi ESCLUSIVAMENTE con il JSON, nient'altro.
 """
