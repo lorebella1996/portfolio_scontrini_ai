@@ -57,9 +57,32 @@ def validate(dati: dict) -> tuple[bool, list[str]]:
 
     for i, prodotto in enumerate(prodotti):
         nome = prodotto.get("nome", f"riga {i + 1}")
+
+        tipo = prodotto.get("tipo")
+        if tipo not in ("prodotto", "sconto"):
+            note.append(
+                f"Prodotto '{nome}': il campo 'tipo' ('{tipo}') è mancante o non "
+                "riconosciuto, trattato come 'prodotto' di default."
+            )
+            tipo = "prodotto"
+
+        prezzo_totale = prodotto.get("prezzo_totale")
+
+        if tipo == "sconto":
+            # Una riga di sconto/rettifica non è un prodotto reale: prezzo
+            # negativo atteso, quantità/prezzo unitario non significativi.
+            # L'unico controllo applicabile è che prezzo_totale sia numerico.
+            if not isinstance(prezzo_totale, (int, float)) or isinstance(prezzo_totale, bool):
+                note.append(
+                    f"Prodotto '{nome}': il campo 'prezzo_totale' ('{prezzo_totale}') non è un numero valido."
+                )
+                somma_valida = False
+                continue
+            somma_prodotti += prezzo_totale
+            continue
+
         quantita = prodotto.get("quantita")
         prezzo_unitario = prodotto.get("prezzo_unitario")
-        prezzo_totale = prodotto.get("prezzo_totale")
 
         campi_numerici_ok = True
         for campo, valore in (
