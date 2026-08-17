@@ -130,6 +130,7 @@ with tab_dashboard:
                         "stato_validazione": s.get("stato_validazione"),
                         "categoria": categoria,
                         "prezzo_totale": p.get("prezzo_totale") or 0,
+                        "tipo": p.get("tipo") if p.get("tipo") in ("prodotto", "sconto") else "prodotto",
                     }
                 )
 
@@ -220,9 +221,14 @@ with tab_dashboard:
             # su schermi stretti (mobile) due grafici affiancati diventano
             # troppo compressi per essere leggibili, mentre a piena larghezza
             # restano leggibili sia su desktop sia su smartphone.
+            #
+            # Escludono le righe "sconto": queste due ripartizioni devono
+            # mostrare solo prodotti realmente acquistati, non rettifiche.
+            df_solo_prodotti = df_filtrato[df_filtrato["tipo"] != "sconto"]
+
             st.subheader("Spesa per categoria")
             spesa_categoria = (
-                df_filtrato.groupby("categoria", as_index=False)["prezzo_totale"]
+                df_solo_prodotti.groupby("categoria", as_index=False)["prezzo_totale"]
                 .sum()
                 .sort_values("prezzo_totale", ascending=True)
             )
@@ -239,7 +245,7 @@ with tab_dashboard:
 
             st.subheader("Spesa per negozio")
             spesa_negozio = (
-                df_filtrato.groupby("negozio", as_index=False)["prezzo_totale"]
+                df_solo_prodotti.groupby("negozio", as_index=False)["prezzo_totale"]
                 .sum()
                 .sort_values("prezzo_totale", ascending=True)
             )
