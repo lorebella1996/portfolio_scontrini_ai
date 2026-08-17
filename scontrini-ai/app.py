@@ -29,6 +29,13 @@ tab_upload, tab_dashboard = st.tabs(["Upload scontrino", "Dashboard di spesa"])
 with tab_upload:
     st.header("Carica uno scontrino")
 
+    st.warning(
+        "⚠️ Questa è una demo pubblica: tutti gli scontrini caricati sono visibili a "
+        "chiunque usi questa app (non c'è un sistema di account personali). Non caricare "
+        "scontrini con informazioni sensibili o dati personali che preferisci non "
+        "condividere pubblicamente."
+    )
+
     uploaded_file = st.file_uploader(
         "Carica una foto dello scontrino", type=["png", "jpg", "jpeg"]
     )
@@ -98,6 +105,11 @@ with tab_upload:
 
 with tab_dashboard:
     st.header("Dashboard di spesa")
+
+    st.info(
+        "ℹ️ I dati mostrati in questa dashboard sono condivisi tra tutti i visitatori "
+        "della demo, non solo i tuoi caricamenti personali."
+    )
 
     scontrini = get_all_scontrini()
 
