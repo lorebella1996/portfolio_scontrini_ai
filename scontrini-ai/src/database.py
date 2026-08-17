@@ -90,18 +90,27 @@ def save_scontrino(dati: dict, is_valid: bool) -> int:
 
     prodotti = dati.get("prodotti", [])
     if prodotti:
-        righe_prodotti = [
-            {
-                "scontrino_id": scontrino_id,
-                "nome": prodotto.get("nome"),
-                "quantita": prodotto.get("quantita"),
-                "prezzo_unitario": prodotto.get("prezzo_unitario"),
-                "prezzo_totale": prodotto.get("prezzo_totale"),
-                "categoria": prodotto.get("categoria"),
-                "tipo": prodotto.get("tipo") if prodotto.get("tipo") in ("prodotto", "sconto") else "prodotto",
-            }
-            for prodotto in prodotti
-        ]
+        righe_prodotti = []
+        for prodotto in prodotti:
+            tipo_raw = prodotto.get("tipo")
+            if tipo_raw not in ("prodotto", "sconto"):
+                print(f"[WARNING] Campo 'tipo' non valido/mancante: {tipo_raw!r} per prodotto "
+                      f"'{prodotto.get('nome')}' — normalizzato a 'prodotto' come fallback.")
+                tipo_normalizzato = "prodotto"
+            else:
+                tipo_normalizzato = tipo_raw
+
+            righe_prodotti.append(
+                {
+                    "scontrino_id": scontrino_id,
+                    "nome": prodotto.get("nome"),
+                    "quantita": prodotto.get("quantita"),
+                    "prezzo_unitario": prodotto.get("prezzo_unitario"),
+                    "prezzo_totale": prodotto.get("prezzo_totale"),
+                    "categoria": prodotto.get("categoria"),
+                    "tipo": tipo_normalizzato,
+                }
+            )
         try:
             client.table("prodotti").insert(righe_prodotti).execute()
         except Exception as e:
