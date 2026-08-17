@@ -12,7 +12,9 @@ Schema atteso su Supabase:
   data è NULL quando la stringa estratta non è una data calendaristica valida;
   data_raw contiene sempre la stringa originale così com'è stata estratta.
 - prodotti(id, scontrino_id [FK -> scontrini.id], nome, quantita, prezzo_unitario,
-  prezzo_totale, categoria)
+  prezzo_totale, categoria, tipo)
+  tipo ∈ {'prodotto', 'sconto'} — 'sconto' per righe di sconto/rettifica, che
+  possono avere prezzo_totale negativo.
 """
 
 from datetime import datetime
@@ -96,6 +98,7 @@ def save_scontrino(dati: dict, is_valid: bool) -> int:
                 "prezzo_unitario": prodotto.get("prezzo_unitario"),
                 "prezzo_totale": prodotto.get("prezzo_totale"),
                 "categoria": prodotto.get("categoria"),
+                "tipo": prodotto.get("tipo") if prodotto.get("tipo") in ("prodotto", "sconto") else "prodotto",
             }
             for prodotto in prodotti
         ]
